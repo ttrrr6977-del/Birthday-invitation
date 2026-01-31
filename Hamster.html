@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hamstar Tapping Game</title>
+
+  <!-- Tailwind (optional; remove if not needed) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* Simple floating animation to replace Framer Motion */
+    @keyframes float {
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+      100% { transform: translateY(0); }
+    }
+
+    .hamster-img {
+      animation: float 1.2s infinite;
+    }
+
+    .modal-bg {
+      background: rgba(0,0,0,0.4);
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center justify-center bg-black p-6">
+
+  <h1 class="text-4xl font-bold mb-6 text-white">Hamstar Tapping Game</h1>
+
+  <div class="p-6 shadow-xl rounded-2xl bg-white w-full max-w-md text-center">
+
+    <img
+      id="hamster"
+      src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Golden_Hamster.jpg/320px-Golden_Hamster.jpg"
+      class="hamster-img w-60 h-60 mx-auto rounded-2xl cursor-pointer select-none"
+    />
+
+    <div id="scoreDisplay" class="mt-6 text-2xl font-semibold">$ 0</div>
+
+    <div class="mt-6 text-left space-y-4">
+
+      <h2 class="text-xl font-bold">Withdraw Options</h2>
+
+      <div class="grid grid-cols-3 gap-4">
+        <button onclick="openWithdraw('UPI')" class="flex flex-col items-center p-3 bg-gray-200 rounded-2xl hover:bg-gray-300">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/UPI-Logo.png/320px-UPI-Logo.png" class="w-12 h-12" />
+          <span class="text-sm mt-2">UPI</span>
+        </button>
+
+        <button onclick="openWithdraw('Paytm')" class="flex flex-col items-center p-3 bg-gray-200 rounded-2xl hover:bg-gray-300">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Paytm_logo.png/320px-Paytm_logo.png" class="w-12 h-12" />
+          <span class="text-sm mt-2">Paytm</span>
+        </button>
+
+        <button onclick="openWithdraw('Bank')" class="flex flex-col items-center p-3 bg-gray-200 rounded-2xl hover:bg-gray-300">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Generic_Bank_Icon.png/320px-Generic_Bank_Icon.png" class="w-12 h-12" />
+          <span class="text-sm mt-2">Bank</span>
+        </button>
+      </div>
+
+      <div class="mt-4">
+        <h3 class="font-medium">Withdrawal history (demo)</h3>
+        <div id="historyBox" class="mt-2 max-h-40 overflow-y-auto text-sm text-gray-700">
+          No withdrawals yet.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Withdraw Modal -->
+  <div id="withdrawModal" class="hidden fixed inset-0 flex items-center justify-center modal-bg z-50">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md">
+      <h2 id="withdrawTitle" class="text-xl font-bold mb-2"></h2>
+
+      <label class="block text-sm mb-1">Destination</label>
+      <input id="destinationInput" class="w-full p-2 border rounded mb-3" />
+
+      <label class="block text-sm mb-1">Amount</label>
+      <input id="amountInput" type="number" class="w-full p-2 border rounded mb-3" min="1" />
+
+      <div class="flex justify-between items-center">
+        <button onclick="closeWithdraw()" class="rounded-2xl px-4 py-2 bg-gray-300">Cancel</button>
+        <button onclick="doWithdraw()" id="confirmBtn" class="rounded-2xl px-4 py-2 bg-blue-500 text-white">
+          Confirm Withdraw
+        </button>
+      </div>
+
+      <div class="text-xs text-gray-500 mt-3">
+        Note: This is a demo withdrawal flow. No real money is transferred.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const scoreKey = "hamstar_score";
+    const historyKey = "hamstar_withdraw_history";
+
+    // Load saved data
+    let score = Number(localStorage.getItem(scoreKey)) || 0;
+    let history = JSON.parse(localStorage.getItem(historyKey) || "[]");
+
+    let currentMethod = "";
+    let processing = false;
+
+    const scoreDisplay = document.getElementById("scoreDisplay");
+    const hamster = document.getElementById("hamster");
+    const historyBox = document.getElementById("historyBox");
+
+    function updateScore() {
+      scoreDisplay.textContent = `$ ${score}`;
+      localStorage.setItem(scoreKey, score);
+    }
+
+    function updateHistory() {
+      localStorage.setItem(historyKey, JSON.stringify(history));
+
+      if (history.length === 0) {
+        historyBox.textContent = "No withdrawals yet.";
+        return;
+      }
+
+      historyBox.innerHTML = history
+        .map(
+          (h) => `
+        <div class="flex justify-between p-2 border-b">
+          <div>
+            <div class="font-semibold">${h.method} → ${h.destination}</div>
+            <div class="text-xs text-gray-600">${new Date(h.date).toLocaleString()}</div>
+          </div>
+          <div class="font-semibold">$${h.amount}</div>
+        </div>`
+        )
+        .join("");
+    }
+
+    // Tap to increase score
+    hamster.addEventListener("click", () => {
+      score++;
+      updateScore();
+    });
+
+    updateScore();
+    updateHistory();
+
+    // Modal handling
+    function openWithdraw(method) {
+      currentMethod = method;
+
+      document.getElementById("withdrawTitle").textContent = `Withdraw — ${method}`;
+      document.getElementById("destinationInput").value = "";
+      document.getElementById("amountInput").value = "";
+      document.getElementById("amountInput").max = score;
+
+      document.getElementById("withdrawModal").classList.remove("hidden");
+    }
+
+    function closeWithdraw() {
+      document.getElementById("withdrawModal").classList.add("hidden");
+    }
+
+    function doWithdraw() {
+      if (processing) return;
+
+      const dest = document.getElementById("destinationInput").value.trim();
+      const amount = Number(document.getElementById("amountInput").value);
+
+      if (dest.length < 3) {
+        alert("Please enter a valid destination.");
+        return;
+      }
+      if (!amount || amount <= 0) {
+        alert("Enter a valid positive amount.");
+        return;
+      }
+      if (amount > score) {
+        alert("Insufficient balance.");
+        return;
+      }
+
+      processing = true;
+      document.getElementById("confirmBtn").textContent = "Processing...";
+
+      setTimeout(() => {
+        score -= amount;
+        updateScore();
+
+        const record = {
+          id: Date.now(),
+          method: currentMethod,
+          destination: dest,
+          amount,
+          date: new Date().toISOString(),
+          status: "Success",
+        };
+
+        history.unshift(record);
+        history = history.slice(0, 20);
+        updateHistory();
+
+        alert(`Demo withdrawal complete. ${amount} deducted.`);
+        processing = false;
+        document.getElementById("confirmBtn").textContent = "Confirm Withdraw";
+        closeWithdraw();
+      }, 1200);
+    }
+  </script>
+</body>
+</html>
